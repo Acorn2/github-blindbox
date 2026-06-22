@@ -20,16 +20,29 @@ jobs:
       - name: 拉取最新 Trending 数据
         run: curl -sL -o trending-feed.json https://raw.githubusercontent.com/zhangxq0606-ctrl/github-blindbox/main/trending-feed.json
 
-      - name: 生成摘要
+      - name: 恢复历史去重缓存
+        id: cache-restore
+        uses: actions/cache@v4
+        with:
+          path: .trending-history.json
+          key: trending-history-${{ github.repository }}
+
+      - name: 生成摘要（带历史去重）
         env:
           ANTHROPIC_AUTH_TOKEN: ${{ secrets.ANTHROPIC_AUTH_TOKEN }}
           ANTHROPIC_BASE_URL: ${{ secrets.ANTHROPIC_BASE_URL }}
           ANTHROPIC_MODEL: ${{ secrets.ANTHROPIC_MODEL }}
         run: |
-          cat trending-feed.json | node scripts/github-digest.js > /tmp/digest.txt
+          EXCLUDE_ARGS=""
+          if [ -s .trending-history.json ]; then
+            EXCLUDE_ARGS="--exclude-file .trending-history.json"
+            echo "历史去重文件存在，将排除已推送项目"
+          fi
+          cat trending-feed.json | node scripts/github-digest.js $EXCLUDE_ARGS --history-output .trending-history.new.json > /tmp/digest.txt
           echo "摘要生成完成"
 
       - name: 发送邮件
+        id: send-email
         env:
           QQ_EMAIL: ${{ secrets.QQ_EMAIL }}
           QQ_SMTP_AUTH_CODE: ${{ secrets.QQ_SMTP_AUTH_CODE }}
@@ -37,3 +50,21 @@ jobs:
           cat /tmp/digest.txt | node scripts/send-email.js \
             --to "$QQ_EMAIL" \
             --subject "GitHub 每日盲盒 — $(date '+%Y-%m-%d')"
+
+      - name: 更新历史去重缓存
+        if: steps.send-email.outcome == 'success'
+        run: |
+          if [ -s .trending-history.new.json ]; then
+            # 合并今日项目和旧历史，去重后保留最近 300 条
+            node -e "
+              const fs = require('fs');
+              const today = JSON.parse(fs.readFileSync('.trending-history.new.json','utf-8'));
+              let history = [];
+              try { history = JSON.parse(fs.readFileSync('.trending-history.json','utf-8')); } catch {}
+              const merged = [...new Set([...history, ...today])];
+              const trimmed = merged.slice(-300);
+              fs.writeFileSync('.trending-history.json', JSON.stringify(trimmed));
+              console.log('历史去重缓存已更新: ' + trimmed.length + ' 条');
+            "
+            rm -f .trending-history.new.json
+          fi
