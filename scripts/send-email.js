@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 
 // ============================================================================
-// GitHub 每日盲盒 — QQ Email Delivery Script (HTML Enhanced)
+// GitHub 每日盲盒 — 163 Email Delivery Script (HTML Enhanced)
 // ============================================================================
-// Sends the digest via QQ SMTP with rich HTML formatting.
+// Sends the digest via 163 SMTP with rich HTML formatting.
 //
 // Usage:
-//   node send-email.js --to xxx@qq.com --subject "GitHub 每日盲盒" < digest.txt
-//   node send-email.js --to xxx@qq.com --file /tmp/digest.txt
+//   node send-email.js --to xxx@163.com --subject "GitHub 每日盲盒" < digest.txt
+//   node send-email.js --to xxx@163.com --file /tmp/digest.txt
 // ============================================================================
 
 import { readFile } from 'fs/promises';
@@ -17,8 +17,8 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { marked } from 'marked';
 
-const QQ_SMTP_HOST = 'smtp.qq.com';
-const QQ_SMTP_PORT = 465;
+const SMTP_HOST = 'smtp.163.com';
+const SMTP_PORT = 465;
 
 // -- Convert markdown digest to styled HTML body -----------------------------
 
@@ -115,10 +115,12 @@ function getArg(name) {
 // -- Main --------------------------------------------------------------------
 
 async function main() {
-  const toEmail = getArg('--to') || process.env.QQ_EMAIL;
+  loadEnv({ path: join(homedir(), '.follow-builders', '.env') });
+
+  const toEmail = getArg('--to') || process.env.EMAIL_ADDRESS;
   const subject = getArg('--subject');
 
-  if (!toEmail) { console.error('Error: --to or QQ_EMAIL required'); process.exit(1); }
+  if (!toEmail) { console.error('Error: --to or EMAIL_ADDRESS required'); process.exit(1); }
 
   const digestText = await getDigestText();
   if (!digestText || digestText.trim().length === 0) {
@@ -126,15 +128,13 @@ async function main() {
     return;
   }
 
-  loadEnv({ path: join(homedir(), '.follow-builders', '.env') });
-
-  const smtpUser = process.env.QQ_EMAIL;
-  const smtpPass = process.env.QQ_SMTP_AUTH_CODE;
-  if (!smtpUser) { console.error('Error: QQ_EMAIL not found in .env'); process.exit(1); }
-  if (!smtpPass) { console.error('Error: QQ_SMTP_AUTH_CODE not found in .env'); process.exit(1); }
+  const smtpUser = process.env.EMAIL_ADDRESS;
+  const smtpPass = process.env.EMAIL_SMTP_AUTH_CODE;
+  if (!smtpUser) { console.error('Error: EMAIL_ADDRESS not found in environment'); process.exit(1); }
+  if (!smtpPass) { console.error('Error: EMAIL_SMTP_AUTH_CODE not found in environment'); process.exit(1); }
 
   const transporter = createTransport({
-    host: QQ_SMTP_HOST, port: QQ_SMTP_PORT, secure: true,
+    host: SMTP_HOST, port: SMTP_PORT, secure: true,
     auth: { user: smtpUser, pass: smtpPass }
   });
 

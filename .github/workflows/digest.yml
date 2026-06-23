@@ -15,7 +15,7 @@ jobs:
           node-version: '20'
 
       - name: 安装依赖
-        run: cd scripts && npm install
+        run: npm install
 
       - name: 拉取最新 Trending 数据
         run: curl -sL -o trending-feed.json https://raw.githubusercontent.com/zhangxq0606-ctrl/github-blindbox/main/trending-feed.json
@@ -44,11 +44,11 @@ jobs:
       - name: 发送邮件
         id: send-email
         env:
-          QQ_EMAIL: ${{ secrets.QQ_EMAIL }}
-          QQ_SMTP_AUTH_CODE: ${{ secrets.QQ_SMTP_AUTH_CODE }}
+          EMAIL_ADDRESS: ${{ secrets.EMAIL_ADDRESS }}
+          EMAIL_SMTP_AUTH_CODE: ${{ secrets.EMAIL_SMTP_AUTH_CODE }}
         run: |
           cat /tmp/digest.txt | node scripts/send-email.js \
-            --to "$QQ_EMAIL" \
+            --to "$EMAIL_ADDRESS" \
             --subject "GitHub 每日盲盒 — $(date '+%Y-%m-%d')"
 
       - name: 更新历史去重缓存
